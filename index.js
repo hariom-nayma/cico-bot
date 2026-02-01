@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('Starting bot initialization...');
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
 const sharp = require('sharp');
@@ -47,30 +48,6 @@ function saveUserToken(userId, token) {
     }
 
     data.token = token;
-    db[userId] = data;
-    saveDB(db);
-}
-
-// Helper to get stretch setting
-function getStretchSetting(userId) {
-    const db = loadDB();
-    const data = db[userId];
-    if (!data) return true; // Default to true (stretch enabled)
-    if (typeof data === 'string') return true; // Default for legacy string records
-    return data.stretch !== false; // Return true unless explicitly false
-}
-
-// Helper to save stretch setting
-function saveStretchSetting(userId, isEnabled) {
-    const db = loadDB();
-    let data = db[userId] || { stretch: true }; // Default object if missing
-
-    // Migrate if string
-    if (typeof data === 'string') {
-        data = { token: data, stretch: true };
-    }
-
-    data.stretch = isEnabled;
     db[userId] = data;
     saveDB(db);
 }
@@ -753,94 +730,14 @@ bot.action('last_10_reports', async (ctx) => {
     }
 });
 
-// Action: Get All Data
-bot.action('get_all_data', async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-        const userId = ctx.from.id;
-        const token = getUserToken(userId);
-        const dumpChannel = getDumpChannel(userId);
-
-        if (!token) return ctx.reply('⚠️ Please /login first.');
-        if (!dumpChannel) return ctx.reply('⚠️ No dump channel set. Use /dump <channel_id> to configure it first.');
-
-        await ctx.reply('🔄 Fetching all records (last 365 days)...');
-
-        // Fetch all (365 days limit)
-        const attendanceRecords = await getAttendance(token, 365);
-
-        if (attendanceRecords.length === 0) {
-            return ctx.reply('ℹ️ No records found.');
-        }
-
-        const total = attendanceRecords.length;
-        // Reverse to upload oldest first
-        const recordsToDump = [...attendanceRecords].reverse();
-
-        // Send initial progress message
-        const startTime = Date.now();
-        const progressMsg = await ctx.reply(generateProgressMessage(0, total, startTime));
-
-        let completed = 0;
-
-        for (const record of recordsToDump) {
-            // Upload to dump channel
-            await sendAttendanceReport(ctx, record, dumpChannel);
-            completed++;
-
-            // Update progress bar every 5 records or on last one to avoid rate limits
-            if (completed % 5 === 0 || completed === total) {
-                try {
-                    await ctx.telegram.editMessageText(
-                        ctx.chat.id,
-                        progressMsg.message_id,
-                        null,
-                        generateProgressMessage(completed, total, startTime),
-                        { parse_mode: 'Markdown' }
-                    );
-                } catch (e) {
-                    // Ignore errors (e.g. message not modified)
-                }
-            }
-
-            // Small delay
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-        await ctx.reply('✅ Bulk upload complete!');
-
-    } catch (error) {
-        console.error(error);
-        ctx.reply('❌ Error during bulk upload.');
-    }
-});
-
-function generateProgressMessage(completed, total, startTime) {
-    const percentage = Math.floor((completed / total) * 100);
-    const progressBar = '▓'.repeat(Math.floor(percentage / 10)) + '░'.repeat(10 - Math.floor(percentage / 10));
-    const remaining = total - completed;
-
-    const elapsed = Date.now() - startTime;
-    const rate = completed > 0 ? elapsed / completed : 0;
-    const etaMs = rate * remaining;
-
-    const formatTime = (ms) => {
-        const s = Math.floor(ms / 1000);
-        const m = Math.floor(s / 60);
-        return `${m}m ${s % 60}s`;
-    };
-
-    return `📥 *Uploading Attendance Data*\n\n` +
-        `${progressBar} *${percentage}%*\n\n` +
-        `✅ *Completed:* ${completed}/${total}\n` +
-        `⏳ *Left:* ${remaining}\n` +
-        `⏱ *Time Taken:* ${formatTime(elapsed)}\n` +
-        `🚀 *ETA:* ${formatTime(etaMs)}`;
-}
 
 
+
+console.log('Attempting to launch bot...');
 bot.launch().then(() => {
     console.log('🤖 CICO Bot is running!');
+}).catch((err) => {
+    console.error('❌ Failed to launch bot:', err);
 });
 
 // Enable graceful stop
