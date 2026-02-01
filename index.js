@@ -460,13 +460,23 @@ async function sendUserProfile(ctx, token) {
             // Profile pics are usually standard aspect ratio
             const img = await processImage(profile.profilePic, false);
 
+            const keyboard = Markup.inlineKeyboard([
+                [Markup.button.callback('🕒 Last Check In', 'btn_check')],
+                [Markup.button.callback('📊 Attendance', 'btn_attendance')]
+            ]);
+
             if (Buffer.isBuffer(img)) {
-                await ctx.replyWithPhoto({ source: img }, { caption: message, parse_mode: 'Markdown' });
+                await ctx.replyWithPhoto({ source: img }, { caption: message, parse_mode: 'Markdown', ...keyboard });
             } else {
-                await ctx.replyWithPhoto(img, { caption: message, parse_mode: 'Markdown' });
+                await ctx.replyWithPhoto(img, { caption: message, parse_mode: 'Markdown', ...keyboard });
             }
         } else {
-            await ctx.replyWithMarkdown(message);
+            await ctx.replyWithMarkdown(message,
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('🕒 Last Check In', 'btn_check')],
+                    [Markup.button.callback('📊 Attendance', 'btn_attendance')]
+                ])
+            );
         }
 
     } catch (e) {
@@ -625,7 +635,8 @@ bot.command('dump', async (ctx) => {
 });
 
 // Command Handler: /check
-bot.command('check', async (ctx) => {
+// Helper: Handle Check
+async function handleCheck(ctx) {
     try {
         const token = getUserToken(ctx.from.id);
         if (!token) {
@@ -651,10 +662,21 @@ bot.command('check', async (ctx) => {
             ctx.reply('❌ An error occurred while fetching data.');
         }
     }
+}
+
+// Command Handler: /check
+bot.command('check', async (ctx) => {
+    await handleCheck(ctx);
 });
 
-// Command: /attendance
-bot.command('attendance', async (ctx) => {
+// Action: Check Button
+bot.action('btn_check', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleCheck(ctx);
+});
+
+// Helper: Handle Attendance Menu
+async function handleAttendanceMenu(ctx) {
     await ctx.reply('📊 *Attendance Menu*',
         Markup.inlineKeyboard([
             [Markup.button.callback('📅 Today\'s Report', 'today_report')],
@@ -662,6 +684,17 @@ bot.command('attendance', async (ctx) => {
             [Markup.button.callback('📥 Get All Data', 'get_all_data')]
         ])
     );
+}
+
+// Command: /attendance
+bot.command('attendance', async (ctx) => {
+    await handleAttendanceMenu(ctx);
+});
+
+// Action: Attendance Button
+bot.action('btn_attendance', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleAttendanceMenu(ctx);
 });
 
 // Command: /settings
