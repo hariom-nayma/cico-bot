@@ -322,10 +322,37 @@ function generateProgressMessage(completed, total, startTime) {
         `🚀 *ETA:* ${formatTime(etaMs)}`;
 }
 
-// Command: /login
-bot.command('login', async (ctx) => {
+// Helper to start login flow
+async function startLoginFlow(ctx) {
     loginSessions[ctx.from.id] = { step: 'EMAIL' };
     await ctx.reply('📧 Please enter your email address:');
+}
+
+// Command: /start
+bot.start(async (ctx) => {
+    const user = ctx.from;
+    const greeting = `👋 *Hello, ${escapeMarkdown(user.first_name)}!*\n\n` +
+        `🤖 Welcome to *CICO Bot*.\n` +
+        `I can help you track your attendance and handle your reports.\n\n` +
+        `🚀 *Get Started:*\n` +
+        `Click the button below to login with your student credentials.`;
+
+    await ctx.replyWithMarkdown(greeting,
+        Markup.inlineKeyboard([
+            [Markup.button.callback('🔐 Login', 'login_action')]
+        ])
+    );
+});
+
+// Action: Login Button
+bot.action('login_action', async (ctx) => {
+    await ctx.answerCbQuery();
+    await startLoginFlow(ctx);
+});
+
+// Command: /login
+bot.command('login', async (ctx) => {
+    await startLoginFlow(ctx);
 });
 
 // Handle text messages for login wizard
